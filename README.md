@@ -93,8 +93,65 @@ DAG가 트리거되면, 이후의 학습·평가·릴리즈 판정·등록 과�
 Airflow DAG의 태스크 구성과 의존성에 대한 자세한 설명은 **Pipeline Design** 섹션에서 다룹니다.
 
 ---
+## 5. Technology Stack
 
-## 5. Pipeline Design
+![Technology Stack](./docs/Technology%20Stack.png)
+
+### **Core Components**
+
+- Local(**WSL2**)에서 개발 / Cloud(**EC2**)에서 동작 검증
+- **Docker Compose** 기반 컨테이너 구성
+- **Apache Airflow** (DAG 기반 CT 파이프라인 오케스트레이션)
+- **MLflow** (실험 결과 추적 및 PASS 모델 Registry 등록)
+- **SQLite** *(Airflow 메타데이터 및 MLflow Tracking/Registry 백엔드 저장소)*
+---
+
+## 6. System Architecture
+![System Architecture](./docs/airflow_dag_수정.svg)
+
+> **Airflow를 중심으로 Continuous Training 파이프라인을 실행**하고, 파이프라인 실행 과정에서 생성되는 **학습 결과 및 메타데이터를 MLflow에 기록**하는 구조입니다.
+
+### 6.1 Execution Flow
+
+* DAG를 실행하며 `Snapshot → Train → Eval → Gate → Register` 전 과정을 오케스트레이션합니다.
+* 각 태스크 실행 중, **릴리즈 게이트를 통과한 모델만 MLflow Server**에 메트릭 및 모델을 등록합니다.
+
+### 6.2 Service Access
+
+사용자가 각 서비스에 직접 접근할 때 사용하는 URL은 다음과 같습니다.
+
+| Service | URL | Note |
+| :--- | :--- | :--- |
+| **Airflow Web UI** | `http://localhost:8080` | DAG 관리 및 로그 확인 |
+| **MLflow UI / API** | `http://localhost:5000` | 실험 추적 및 모델 레지스트리 |
+
+### 6.3 Storage & Volume Mount Strategy
+
+>시스템은 Docker 기반으로 구성되며, 각 컨테이너는 **역할에 따라 분리된 스토리지를 마운트**하도록 설계되었습니다.
+(아키텍처 다이어그램의 주황색 점선 영역 참조)
+
+#### 6.3.1. Airflow Container Mount (Left Side)
+Airflow 컨테이너는 **좌측 스토리지 영역(분홍색 박스)**을 마운트합니다.
+
+* **Code & Config (Read)**
+    * `cli`, `configs`, `DAG`, `tools`, `scripts`
+    * DAG 실행을 위한 코드 및 설정 파일 Read
+* **Artifacts (Read / Write)**
+    * 데이터 스냅샷, 모델별 학습 결과 및 체크포인트 저장
+    * 평가 단계에서 체크포인트를 다시 로드할 때 Read
+* **Registry (Write)**
+    * 릴리즈 게이트를 통과한 모델의 메타데이터를 `registry/metadata.jsonl` 파일에 **append 방식으로 기록**
+
+#### 6.3.2. MLflow Container Mount (Right Side)
+MLflow 컨테이너는 **우측 스토리지 영역(분홍색 박스)**을 마운트합니다.
+
+* **mlruns (Read / Write)**
+    * 실험 메트릭, 파라미터, 아티팩트 기록
+    * Model Registry 정보 저장 및 조회
+
+---
+
+## 7. Pipeline Design
 
 본 CT 파이프라인은 **dataset snapshot을 1회 수행한 후**, 각 모델에 대해 학습부터 등록까지의 CT 사이클을 **순차적으로 실행**하는 구조로 설계되었습니다.
 
@@ -126,7 +183,7 @@ data_snapshot (once)
 
 ---
 
-## 6. Dataset Snapshot & Reproducibility
+## 8. Dataset Snapshot & Reproducibility
 
 * Dataset: FashionMNIST (torchvision 제공 train / test)
 * Train / Validation split:
@@ -137,7 +194,7 @@ data_snapshot (once)
 
 ---
 
-## 7. Evaluation Metrics
+## 9. Evaluation Metrics
 
 * **Top-1 Accuracy**
 * **Average F1-score**
@@ -147,7 +204,7 @@ data_snapshot (once)
 
 ---
 
-## 8. Release Gate Policy
+## 10. Release Gate Policy
 
 ### Release gate criteria
 
@@ -164,7 +221,7 @@ FAIL: [Info] baseline failed release gate. Reasons: Low Accuracy (0.8432 < 0.9),
 
 ---
 
-## 9. Results Summary
+## 11. Results Summary
 
 | Model           | Acc    | Avg-F1 | p95(ms)| Gate | Reason              |
 | --------------- | ------ | ------ | -------| ---- | --------------------|
@@ -174,7 +231,7 @@ FAIL: [Info] baseline failed release gate. Reasons: Low Accuracy (0.8432 < 0.9),
 
 ---
 
-## 10. Model Registry
+## 12. Model Registry
 
 릴리즈 게이트를 **PASS**한 모델만 레지스트리에 등록하며, 아래는 실험 수행 후 확인된 모델 레지스트리 등록 결과입니다.
 
@@ -206,7 +263,7 @@ Experiments 내 **Runs / Models 및 각 run의 세부 메타데이터**는 아�
 ---
 
 
-## 11. Project Structure
+## 13. Project Structure
 
 ```text
 airflow-mlflow-mlops-ct-pipeline/
