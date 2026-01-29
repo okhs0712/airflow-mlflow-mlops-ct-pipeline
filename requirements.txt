@@ -1,0 +1,15 @@
+cryptography<46.0.0
+
+# PyTorch (CPU 버전 명시 - 설치 속도 향상 및 호환성 확보)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+mlflow==3.7.0
+scikit-learn
+pyyaml
+click
+numpy
+pandas
+setuptools
+wheel
+apache-airflow-providers-fab

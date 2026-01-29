@@ -1,0 +1,8 @@
+{
+    "model_name": "efficientnet_b0",
+    "acc": 0.9498,
+    "f1_score": 0.9494,
+    "p95_latency_ms": 15.46,
+    "cutoff_threshold": 0.1059,
+    "evaluated_at": "2025-12-24 04:25:52"
+}

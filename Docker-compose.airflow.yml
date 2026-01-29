@@ -1,0 +1,59 @@
+services:
+  # 1. MLflow Tracking Server (SQLite 기반)
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.7.0
+    container_name: mlflow_server
+    environment:
+    - PUBLIC_IP=${PUBLIC_IP}
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow_db/mlflow.db
+      --default-artifact-root ${PWD}/mlruns
+      --host 0.0.0.0
+      --port 5000
+      --allowed-hosts "mlflow_server, mlflow_server:5000, localhost, localhost:5000, 127.0.0.1, 127.0.0.1:5000, ${PUBLIC_IP}, ${PUBLIC_IP}:5000"
+    # MLflow 3.x부터는 allowed-hosts 설정 필요
+    ports:
+      - "5000:5000"
+    volumes:
+      - ${PWD}/mlruns:${PWD}/mlruns # 모델 파일(Artifacts) 저장소 공유
+      - ./mlflow_db:/mlflow_db # DB 파일 저장소 (SQLite)
+
+  # 2. Airflow (Standalone 모드: 웹서버+스케줄러 통합)
+  airflow:
+    image: apache/airflow:3.1.5-python3.12
+    container_name: airflow_standalone
+    command: >
+      bash -c "
+        pip install -r /requirements.txt &&
+        airflow db migrate &&
+        airflow standalone
+      "
+    # airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+    environment:
+      # 실행 모드 설정 (SQLite 사용 시 필수)
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/db/airflow.db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS=True
+
+    volumes:
+      # 프로젝트 코드 마운트
+      - ./DAG:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - ./configs:/opt/airflow/configs
+      - ./tools:/opt/airflow/tools
+      - ./cli:/opt/airflow/cli
+      - ./registry:/opt/airflow/registry
+      
+      # 결과물 저장소 마운트
+      - ./artifacts:/opt/airflow/artifacts
+      - ${PWD}/mlruns:${PWD}/mlruns # MLflow와 저장소 공유
+      - ./airflow_db:/opt/airflow/db 
+      - ./requirements.txt:/requirements.txt  # 추가 패키지 설치용 파일 마운트
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mlflow
+    # train.py에서 CPU 코어 수 늘리기 위한 설정
+    shm_size: "1g"

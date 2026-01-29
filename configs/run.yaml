@@ -1,0 +1,51 @@
+# 프로젝트 기본 설정
+project_name: "mlops-fashion-mnist"
+seed: 42  # [필수] 데이터 분할 시드 고정
+
+# 데이터셋 설정
+data:
+  raw_dir: "data/raw"
+  split_ratio: 0.9          # Train 9 : Val 1
+  tag_format: "mnist_v1_seed{}"
+
+# 학습 공통 설정
+train:
+  batch_size: 32
+  num_workers: 8             # CPU 코어 수 고려
+  image_size: 224            # [필수] 224x224 리사이즈
+  device: "cpu"              # [필수] CPU 사용 제한
+
+# 모델별 상세 설정
+models:
+  # 1. 베이스라인 (Pretrained 없음)
+  baseline:
+    type: "simple_cnn"
+    pretrained: false
+    epochs: 1                # 금방 끝내기 위해 짧게
+    learning_rate: 0.001
+
+  # 2. ResNet34 (ImageNet Pretrained)
+  resnet34:
+    type: "resnet34"
+    pretrained: true
+    epochs: 10               # [권장] 10~30 epoch 이내
+    learning_rate: 0.0001    # Fine-tuning이므로 낮게 설정
+
+  # 3. EfficientNet B0 (ImageNet Pretrained)
+  efficientnet_b0:
+    type: "efficientnet_b0"
+    pretrained: true
+    epochs: 10               # [권장] 10~30 epoch 이내
+    learning_rate: 0.0001
+
+# 평가 및 게이트 설정
+evaluation:
+  batch_size: 1              # [필수] 지연 시간 측정 시 배치 1 고정
+  warmup_steps: 10           # [필수] 워밍업 10장
+  latency_steps: 200         # [필수] 200장으로 p95 계산
+  
+  # 릴리즈 게이트 통과 기준 (옵션 2: 기본 임계값에서 p95만 조정)
+  thresholds:
+    min_accuracy: 0.92      # Top-1 Acc
+    min_f1_score: 0.90       # Avg F1
+    max_latency: 20.0        # p95 ms

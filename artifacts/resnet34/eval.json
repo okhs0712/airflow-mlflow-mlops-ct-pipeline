@@ -1,0 +1,8 @@
+{
+    "model_name": "resnet34",
+    "acc": 0.9449,
+    "f1_score": 0.9453,
+    "p95_latency_ms": 19.15,
+    "cutoff_threshold": 0.051,
+    "evaluated_at": "2025-12-23 23:50:18"
+}
